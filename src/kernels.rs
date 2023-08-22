@@ -119,7 +119,10 @@ impl Kernel for LayeredKernel {
         for j in 0..w {
             for i in 0..w {
                 let mut counts = vec![0_u16; self.layers.len()];
-                let center = (self.layers[0].width() / 2 + i, self.layers[0].height() / 2 + j);
+                let center = (
+                    self.layers[0].width() / 2 + i,
+                    self.layers[0].height() / 2 + j,
+                );
                 for (layer, count) in self.layers.iter().zip(&mut counts) {
                     for y in 0..layer.height() {
                         for x in 0..layer.width() {
@@ -211,6 +214,56 @@ pub fn life_layered_kernel() -> LayeredKernel {
         .map(|i| i == 1)
         .collect();
     let kernel = Array2D::from_array(3, kernel);
+
+    LayeredKernel::new(decider, vec![kernel])
+}
+
+pub fn larger_than_life_layered_kernel() -> LayeredKernel {
+    fn decider(center: bool, counts: &[u16]) -> bool {
+        let neighbors = counts[0];
+        let mut output = false;
+
+        if neighbors <= 33 {
+            output = false;
+        } 
+        if neighbors >= 34 && neighbors <= 45 {
+            output = true;
+        } 
+        if neighbors >= 58 && neighbors <= 121 {
+            output = false;
+        }
+
+        output
+    }
+
+    let kernel = [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+
+    let kernel = kernel
+        .into_iter()
+        .map(|row| row.into_iter())
+        .flatten()
+        .map(|i| i == 1)
+        .collect();
+
+    let kernel = Array2D::from_array(17, kernel);
 
     LayeredKernel::new(decider, vec![kernel])
 }
