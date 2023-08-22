@@ -348,11 +348,12 @@ pub struct KernelCache {
     solutions: HashMap<[usize; 4], usize>,
     values: Vec<Array2D<bool>>,
     wrap: Box<dyn Kernel>,
+    hits: usize,
 }
 
 impl KernelCache {
     pub fn new(wrap: Box<dyn Kernel>) -> Self {
-        Self { cache: Default::default(), solutions: Default::default(), values: Default::default(), wrap }
+        Self { cache: Default::default(), solutions: Default::default(), values: Default::default(), wrap, hits: 0 }
     }
 }
 
@@ -362,7 +363,7 @@ impl Kernel for KernelCache {
     }
 
     fn exec(&mut self, blocks: [Block; 4]) -> (Block, KernelResult) {
-        const DOWNSAMPLE: usize = 8;
+        const DOWNSAMPLE: usize = 17;
         let hashes = blocks.clone().map(|block| {
             *self.cache.entry(summarize(&block, DOWNSAMPLE)).or_insert_with(|| {
                 let idx = self.values.len();
@@ -372,6 +373,7 @@ impl Kernel for KernelCache {
         });
 
         let block = if let Some(&soln) = self.solutions.get(&hashes) {
+            self.hits += 1;
             self.values[soln].clone()
         } else {
             let (soln, _) = self.wrap.exec(blocks);
@@ -384,7 +386,8 @@ impl Kernel for KernelCache {
             self.solutions.insert(hashes, idx);
 
             if self.solutions.len() % 1000 == 0 {
-                dbg!(self.solutions.len(), self.values.len());
+                dbg!(self.solutions.len(), self.values.len(), self.hits);
+                eprintln!();
             }
 
             soln
@@ -394,9 +397,12 @@ impl Kernel for KernelCache {
     }
 }
 
-//type Summary = Vec<bool>;
-type Summary = Vec<bool>;
+type Summary = (Vec<bool>, usize);
+//type Summary = usize;
 
 fn summarize(arr: &Array2D<bool>, step: usize) -> Summary {
-    arr.data().iter().step_by(step).copied().collect()
+    (
+        arr.data().iter().step_by(step).copied().collect(),
+        count_true(arr)
+    )
 }
