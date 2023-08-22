@@ -12,7 +12,7 @@ pub struct TemplateApp {
 impl Default for TemplateApp {
     fn default() -> Self {
         let kernel = Box::new(Life);
-        let mut sim = Dense::new(kernel, 100, 100);
+        let mut sim = Dense::new(kernel, 270, 180);
 
         let mut rng = rand::thread_rng();
         for block in sim.data_mut().data_mut() {
