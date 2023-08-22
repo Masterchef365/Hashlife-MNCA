@@ -14,7 +14,7 @@ impl Kernel for Life {
 
         for j in 0..2 {
             for i in 0..2 {
-                let block = &blocks[j + 2 * i];
+                let block = &blocks[i + 2 * j];
 
                 for x in 0..2 {
                     for y in 0..2 {
