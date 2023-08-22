@@ -2,11 +2,11 @@ use crate::array2d::Array2D;
 
 /// Block data, whose size is known by the Kernel
 #[derive(Clone, Debug, Default)]
-pub struct Block(Box<[bool]>);
+pub struct Block(pub Box<[bool]>);
 
 pub trait Kernel {
     /// Power law size of the basic block. E.g. each block has a width of 2^n, where n = self.order()
-    /// For HashLife/Conway life (radius 1), this would be 2, since input would be 4 2x2 blocks and output would be 1 2x2 block
+    /// For HashLife/Conway life (radius 1), this would be 1, since input would be 4 2x2 blocks and output would be 1 2x2 block
     /// For an MNCA with radius 4, this would be 3, since the input would be 4 8x8 blocks and output would be 1 8x8 block
     fn order(&self) -> usize;
 
