@@ -221,7 +221,7 @@ pub fn life_layered_kernel() -> LayeredKernel {
 pub fn larger_than_life_layered_kernel() -> LayeredKernel {
     fn decider(center: bool, counts: &[u16]) -> bool {
         let neighbors = counts[0];
-        let mut output = false;
+        let mut output = center;
 
         if neighbors <= 33 {
             output = false;
