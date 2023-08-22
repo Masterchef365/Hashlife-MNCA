@@ -344,7 +344,7 @@ fn count_true(arr: &Array2D<bool>) -> usize {
 }
 
 pub struct KernelCache {
-    cache: HashMap<Array2D<bool>, usize>,
+    cache: HashMap<Summary, usize>,
     solutions: HashMap<[usize; 4], usize>,
     values: Vec<Array2D<bool>>,
     wrap: Box<dyn Kernel>,
@@ -362,9 +362,9 @@ impl Kernel for KernelCache {
     }
 
     fn exec(&mut self, blocks: [Block; 4]) -> (Block, KernelResult) {
-        const DOWNSAMPLE: usize = 2;
+        const DOWNSAMPLE: usize = 8;
         let hashes = blocks.clone().map(|block| {
-            *self.cache.entry(downsample(&block, DOWNSAMPLE)).or_insert_with(|| {
+            *self.cache.entry(summarize(&block, DOWNSAMPLE)).or_insert_with(|| {
                 let idx = self.values.len();
                 self.values.push(block);
                 idx
@@ -375,12 +375,18 @@ impl Kernel for KernelCache {
             self.values[soln].clone()
         } else {
             let (soln, _) = self.wrap.exec(blocks);
-            let idx = self.values.len();
-            self.values.push(soln.clone());
+            
+            let idx = *self.cache.entry(summarize(&soln, DOWNSAMPLE)).or_insert_with(|| {
+                let idx = self.values.len();
+                self.values.push(soln.clone());
+                idx
+            });
             self.solutions.insert(hashes, idx);
+
             if self.solutions.len() % 1000 == 0 {
-                dbg!(self.solutions.len());
+                dbg!(self.solutions.len(), self.values.len());
             }
+
             soln
         };
 
@@ -388,12 +394,9 @@ impl Kernel for KernelCache {
     }
 }
 
-fn downsample(arr: &Array2D<bool>, step: usize) -> Array2D<bool> {
-    let mut out = Array2D::new(arr.width() / step, arr.height() / step);
-    for i in 0..out.width() {
-        for j in 0..out.height() {
-            out[(i, j)] = arr[(i * step, j * step)];
-        }
-    }
-    out
+//type Summary = Vec<bool>;
+type Summary = Vec<bool>;
+
+fn summarize(arr: &Array2D<bool>, step: usize) -> Summary {
+    arr.data().iter().step_by(step).copied().collect()
 }
