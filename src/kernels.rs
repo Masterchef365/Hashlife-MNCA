@@ -9,34 +9,39 @@ impl Kernel for Life {
 
     fn approximate(&mut self, blocks: [Block; 4]) -> (Block, KernelResult) {
         // Collect everything into a dense buffer
-        let mut buf = [0u8; 16];
-        buf
-            .iter_mut()
-            .zip(blocks.iter().map(|arr| arr.data().iter()).flatten())
-            .for_each(|(f, k)| *f = u8::from(*k));
+        // TODO: Don't allocate in hot loops lol
+        let mut buf: Array2D<u8> = Array2D::new(4, 4);
+
+        for i in 0..2 {
+            for j in 0..2 {
+                let block = &blocks[i + j*2];
+                for x in 0..2 {
+                    for y in 0..2 {
+                        buf[(x + i * 2, y + j * 2)] = u8::from(block[(x, y)]);
+                    }
+                }
+            }
+        }
 
         let mut out_data = vec![false; 4];
 
-        for offset in [0, 1, 4, 5] {
+        for ((ox, oy), out) in [(0, 0), (0, 1), (1, 0), (1, 1)].into_iter().zip(&mut out_data) {
             let mut neighbors = 0;
-            let mut center = 0;
+            let center = buf[(ox + 1, oy + 1)];
             for i in 0..3 {
                 for j in 0..3 {
-                    let idx = offset + i + j * 4;
                     if (i, j) != (1, 1) {
-                        neighbors += buf[idx];
-                    } else {
-                        center = buf[idx];
+                        neighbors += buf[(i + ox, j + oy)];
                     }
                 }
             }
 
-            let result = if center == 1 {
+            *out = if center == 1 {
                 matches!(neighbors, 2 | 3)
             } else {
                 matches!(neighbors, 3)
             };
-            out_data.push(result);
+
         }
 
         let out_block = Array2D::from_array(2, out_data);
