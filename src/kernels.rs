@@ -12,9 +12,10 @@ impl Kernel for Life {
         // TODO: Don't allocate in hot loops lol
         let mut buf: Array2D<u8> = Array2D::new(4, 4);
 
-        for i in 0..2 {
-            for j in 0..2 {
-                let block = &blocks[i + j*2];
+        for j in 0..2 {
+            for i in 0..2 {
+                let block = &blocks[j + 2 * i];
+
                 for x in 0..2 {
                     for y in 0..2 {
                         buf[(x + i * 2, y + j * 2)] = u8::from(block[(x, y)]);
@@ -25,13 +26,16 @@ impl Kernel for Life {
 
         let mut out_data = vec![false; 4];
 
-        for ((ox, oy), out) in [(0, 0), (0, 1), (1, 0), (1, 1)].into_iter().zip(&mut out_data) {
+        for ((ox, oy), out) in [(0, 0), (1, 0), (0, 1), (1, 1)].into_iter().zip(&mut out_data) {
             let mut neighbors = 0;
-            let center = buf[(ox + 1, oy + 1)];
+            let mut center = 0;
             for i in 0..3 {
                 for j in 0..3 {
+                    let p = (i + ox, j + oy);
                     if (i, j) != (1, 1) {
-                        neighbors += buf[(i + ox, j + oy)];
+                        neighbors += buf[p];
+                    } else {
+                        center = buf[p];
                     }
                 }
             }

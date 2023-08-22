@@ -115,8 +115,8 @@ fn sim_widget(sim: &mut Dense, ui: &mut Ui) {
 
     // Draw particles
     let painter = ui.painter_at(widget_area);
-    for i in 0..w {
-        for j in 0..h {
+    for j in 0..h {
+        for i in 0..w {
             if sim.get_pixel((i, j)) {
                 let pt = coords.sim_to_egui((i, j));
                 //dbg!(pt);

@@ -44,8 +44,8 @@ impl Dense {
     }
 
     pub fn step(&mut self) {
-        for i in 0..(self.front.width() - 1) as i32 {
-            for j in 0..(self.front.height() - 1) as i32 {
+        for i in 0..self.front.width() as i32 {
+            for j in 0..self.front.height() as i32 {
                 let (x, y) = if self.zero_borders {
                     (i - 1, j - 1)
                 } else {
@@ -94,6 +94,8 @@ impl Dense {
 
     pub fn get_pixel(&self, index: (usize, usize)) -> bool {
         let (block_idx, pixel_idx) = self.index_block_pixel(index);
+        //dbg!(index, block_idx, pixel_idx);
+        //dbg!();
         self.front[block_idx][pixel_idx]
     }
 
