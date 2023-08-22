@@ -3,7 +3,7 @@ use rand::Rng;
 
 use crate::{
     kernels::{basic_mnca, larger_than_life_layered_kernel, life_layered_kernel, Life, KernelCache},
-    sim::Dense,
+    sim::Dense, array2d::Array2D,
 };
 
 pub struct TemplateApp {
@@ -15,7 +15,8 @@ pub struct TemplateApp {
 impl Default for TemplateApp {
     fn default() -> Self {
         //let kernel = Box::new(basic_mnca());
-        let kernel = Box::new(KernelCache::new(Box::new(basic_mnca())));
+        //let kernel = Box::new(KernelCache::new(Box::new(basic_mnca())));
+        let kernel = Box::new(KernelCache::new(Box::new(larger_than_life_layered_kernel())));
         let mut sim = Dense::new(kernel, 17*3, 10*3);
 
         let mut rng = rand::thread_rng();

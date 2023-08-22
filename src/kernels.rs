@@ -362,8 +362,9 @@ impl Kernel for KernelCache {
     }
 
     fn exec(&mut self, blocks: [Block; 4]) -> (Block, KernelResult) {
+        const DOWNSAMPLE: usize = 2;
         let hashes = blocks.clone().map(|block| {
-            *self.cache.entry(block.clone()).or_insert_with(|| {
+            *self.cache.entry(downsample(&block, DOWNSAMPLE)).or_insert_with(|| {
                 let idx = self.values.len();
                 self.values.push(block);
                 idx
@@ -385,4 +386,14 @@ impl Kernel for KernelCache {
 
         (block, KernelResult::NewBlock)
     }
+}
+
+fn downsample(arr: &Array2D<bool>, step: usize) -> Array2D<bool> {
+    let mut out = Array2D::new(arr.width() / step, arr.height() / step);
+    for i in 0..out.width() {
+        for j in 0..out.height() {
+            out[(i, j)] = arr[(i * step, j * step)];
+        }
+    }
+    out
 }
