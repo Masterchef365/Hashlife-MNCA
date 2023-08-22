@@ -119,7 +119,7 @@ impl Kernel for LayeredKernel {
         for j in 0..w {
             for i in 0..w {
                 let mut counts = vec![0_u16; self.layers.len()];
-                let center = (self.layers[0].width() / 2, self.layers[0].height() / 2);
+                let center = (self.layers[0].width() / 2 + i, self.layers[0].height() / 2 + j);
                 for (layer, count) in self.layers.iter().zip(&mut counts) {
                     for y in 0..layer.height() {
                         for x in 0..layer.width() {
