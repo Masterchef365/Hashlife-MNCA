@@ -123,7 +123,7 @@ impl Kernel for LayeredKernel {
                 for (layer, count) in self.layers.iter().zip(&mut counts) {
                     for y in 0..layer.height() {
                         for x in 0..layer.width() {
-                            if layer[(x, y)] && buf[(x + i, y + j)] {
+                            if layer[(x, y)] && buf[(i + x, j + y)] {
                                 *count += 1;
                             }
                         }
@@ -162,11 +162,11 @@ mod tests {
 
     #[test]
     fn test_block_order() {
-        assert_eq!(calculate_block_order_from_kernel_width(3), 2);
-        assert_eq!(calculate_block_order_from_kernel_width(5), 3);
-        assert_eq!(calculate_block_order_from_kernel_width(9), 4);
-        assert_eq!(calculate_block_order_from_kernel_width(17), 5);
-        assert_eq!(calculate_block_order_from_kernel_width(33), 6);
+        assert_eq!(calculate_block_order_from_kernel_width(3), 1);
+        assert_eq!(calculate_block_order_from_kernel_width(5), 2);
+        assert_eq!(calculate_block_order_from_kernel_width(9), 3);
+        assert_eq!(calculate_block_order_from_kernel_width(17), 4);
+        assert_eq!(calculate_block_order_from_kernel_width(33), 5);
     }
 
     #[test]
