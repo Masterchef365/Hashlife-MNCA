@@ -363,7 +363,7 @@ impl Kernel for KernelCache {
     }
 
     fn exec(&mut self, blocks: [Block; 4]) -> (Block, KernelResult) {
-        const DOWNSAMPLE: usize = 17;
+        const DOWNSAMPLE: usize = 31;
         let hashes = blocks.clone().map(|block| {
             *self.cache.entry(summarize(&block, DOWNSAMPLE)).or_insert_with(|| {
                 let idx = self.values.len();
