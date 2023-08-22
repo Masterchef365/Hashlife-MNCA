@@ -225,10 +225,10 @@ pub fn larger_than_life_layered_kernel() -> LayeredKernel {
 
         if neighbors <= 33 {
             output = false;
-        } 
+        }
         if neighbors >= 34 && neighbors <= 45 {
             output = true;
-        } 
+        }
         if neighbors >= 58 && neighbors <= 121 {
             output = false;
         }
@@ -265,5 +265,78 @@ pub fn larger_than_life_layered_kernel() -> LayeredKernel {
 
     let kernel = Array2D::from_array(17, kernel);
 
+    print_array(&kernel);
+
     LayeredKernel::new(decider, vec![kernel])
+}
+
+pub fn basic_mnca() -> LayeredKernel {
+    let mut layer0 = Array2D::new(17, 17);
+    draw_ring(&mut layer0, 5 * 5, 8 * 7);
+    print_array(&layer0);
+    println!("{}", count_true(&layer0));
+    println!();
+
+    let mut layer1 = Array2D::new(17, 17);
+    draw_ring(&mut layer1, 1, 3 * 4);
+    print_array(&layer1);
+    println!("{}", count_true(&layer1));
+
+    fn decider(mut center: bool, counts: &[u16]) -> bool {
+        let avg = [counts[0] as f32 / 108.0, counts[1] as f32 / 36.0];
+
+        if avg[0] >= 0.210 && avg[0] <= 0.220 {
+            center = true;
+        }
+        if avg[0] >= 0.350 && avg[0] <= 0.500 {
+            center = false;
+        }
+        if avg[0] >= 0.750 && avg[0] <= 0.850 {
+            center = false;
+        }
+        if avg[1] >= 0.100 && avg[1] <= 0.280 {
+            center = false;
+        }
+        if avg[1] >= 0.430 && avg[1] <= 0.550 {
+            center = true;
+        }
+        if avg[0] >= 0.120 && avg[0] <= 0.150 {
+            center = false;
+        }
+
+        center
+    }
+
+    LayeredKernel::new(decider, vec![layer0, layer1])
+}
+
+fn print_array(arr: &Array2D<bool>) {
+    for row in arr.data().chunks_exact(arr.width()) {
+        for &elem in row {
+            if elem {
+                print!("# ");
+            } else {
+                print!("- ");
+            }
+        }
+        println!();
+    }
+}
+
+fn draw_ring(arr: &mut Array2D<bool>, inner_sq: i32, outer_sq: i32) {
+    let w = (arr.width() / 2) as i32;
+    for x in -w..=w {
+        for y in -w..=w {
+            let r2 = x.pow(2) + y.pow(2);
+            if r2 >= inner_sq && r2 < outer_sq {
+                let i = (x + w) as usize;
+                let j = (y + w) as usize;
+                arr[(i, j)] = true;
+            }
+        }
+    }
+}
+
+fn count_true(arr: &Array2D<bool>) -> usize {
+    arr.data().iter().filter(|x| **x).count()
 }

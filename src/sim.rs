@@ -52,12 +52,7 @@ impl Dense {
                     (i, j)
                 };
 
-                let in_blocks = [
-                    (x, y),
-                    (x + 1, y),
-                    (x, y + 1),
-                    (x + 1, y + 1),
-                ];
+                let in_blocks = [(x, y), (x + 1, y), (x, y + 1), (x + 1, y + 1)];
 
                 let in_blocks = in_blocks.map(|uv| get_block_zero_borders(&self.front, uv));
 

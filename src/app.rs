@@ -1,7 +1,10 @@
-use egui::{Sense, Rect, Frame, Ui, Vec2, Rounding, Rgba};
+use egui::{Frame, Rect, Rgba, Rounding, Sense, Ui, Vec2};
 use rand::Rng;
 
-use crate::{sim::Dense, kernels::{Life, life_layered_kernel, larger_than_life_layered_kernel}};
+use crate::{
+    kernels::{basic_mnca, larger_than_life_layered_kernel, life_layered_kernel, Life},
+    sim::Dense,
+};
 
 pub struct TemplateApp {
     sim: Dense,
@@ -11,7 +14,7 @@ pub struct TemplateApp {
 
 impl Default for TemplateApp {
     fn default() -> Self {
-        let kernel = Box::new(larger_than_life_layered_kernel());
+        let kernel = Box::new(basic_mnca());
         let mut sim = Dense::new(kernel, 30, 30);
 
         let mut rng = rand::thread_rng();
@@ -61,7 +64,6 @@ impl eframe::App for TemplateApp {
     }
 }
 
-
 /// Maps sim coordinates to/from egui coordinates
 struct CoordinateMapping {
     width: f32,
@@ -94,7 +96,6 @@ impl CoordinateMapping {
         )
     }
 
-
     /*
     pub fn egui_to_sim(&self, pt: egui::Pos2) -> (usize, usize) {
         glam::Vec2::new(
@@ -106,7 +107,8 @@ impl CoordinateMapping {
 }
 
 fn sim_widget(sim: &mut Dense, ui: &mut Ui) {
-    let (widget_area, _response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
+    let (widget_area, _response) =
+        ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
 
     let (w, h) = sim.pixel_dims();
     let coords = CoordinateMapping::new(w, h, widget_area);
@@ -126,4 +128,3 @@ fn sim_widget(sim: &mut Dense, ui: &mut Ui) {
         }
     }
 }
-
