@@ -7,6 +7,7 @@ pub struct Array2D<T> {
 }
 
 impl<T> Array2D<T> {
+    #[track_caller]
     pub fn from_array(width: usize, data: Vec<T>) -> Self {
         assert_eq!(data.len() % width, 0, "Width does not match data length");
         Self { width, data }

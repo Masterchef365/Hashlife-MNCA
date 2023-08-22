@@ -11,7 +11,7 @@ pub trait Kernel {
 
     /// Given a novel combination of 4 blocks, produce an output block advanced by one time step
     /// (each entry in the input and output blocks are either 0 or 1 indicating dead or live states respectively)
-    fn approximate(&mut self, blocks: [Block; 4]) -> (Block, KernelResult);
+    fn exec(&mut self, blocks: [Block; 4]) -> (Block, KernelResult);
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -61,7 +61,7 @@ impl Dense {
 
                 let in_blocks = in_blocks.map(|uv| get_block_zero_borders(&self.front, uv));
 
-                let (out_block, _) = self.kernel.approximate(in_blocks);
+                let (out_block, _) = self.kernel.exec(in_blocks);
 
                 self.back[(i as usize, j as usize)] = out_block;
             }
@@ -73,14 +73,14 @@ impl Dense {
 
     /// Returns (width, height) in pixels
     pub fn pixel_dims(&self) -> (usize, usize) {
-        let w = block_width(&*self.kernel);
+        let w = calc_block_width(&*self.kernel);
         ((self.front.width() - 1) * w, (self.front.height() - 1) * w)
     }
 
     fn index_block_pixel(&self, index: (usize, usize)) -> ((usize, usize), (usize, usize)) {
         let (mut x, mut y) = index;
 
-        let w = block_width(&*self.kernel);
+        let w = calc_block_width(&*self.kernel);
 
         // Every other frame, the blocks are in an alternate configuration where the result of the
         // last frame is offset by half a block width
@@ -120,6 +120,6 @@ fn get_block_zero_borders(arr: &Array2D<Block>, xy: (i32, i32)) -> Block {
     }
 }
 
-fn block_width(ker: &dyn Kernel) -> usize {
+pub fn calc_block_width(ker: &dyn Kernel) -> usize {
     1 << ker.order()
 }
