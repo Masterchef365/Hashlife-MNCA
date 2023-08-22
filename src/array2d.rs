@@ -1,6 +1,6 @@
 pub type GridPos = (usize, usize);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Array2D<T> {
     width: usize,
     data: Vec<T>,

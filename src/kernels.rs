@@ -1,3 +1,5 @@
+use egui::epaint::ahash::HashMap;
+
 use crate::{
     array2d::Array2D,
     sim::{calc_block_width, Block, Kernel, KernelResult},
@@ -339,4 +341,48 @@ fn draw_ring(arr: &mut Array2D<bool>, inner_sq: i32, outer_sq: i32) {
 
 fn count_true(arr: &Array2D<bool>) -> usize {
     arr.data().iter().filter(|x| **x).count()
+}
+
+pub struct KernelCache {
+    cache: HashMap<Array2D<bool>, usize>,
+    solutions: HashMap<[usize; 4], usize>,
+    values: Vec<Array2D<bool>>,
+    wrap: Box<dyn Kernel>,
+}
+
+impl KernelCache {
+    pub fn new(wrap: Box<dyn Kernel>) -> Self {
+        Self { cache: Default::default(), solutions: Default::default(), values: Default::default(), wrap }
+    }
+}
+
+impl Kernel for KernelCache {
+    fn order(&self) -> usize {
+        self.wrap.order()
+    }
+
+    fn exec(&mut self, blocks: [Block; 4]) -> (Block, KernelResult) {
+        let hashes = blocks.clone().map(|block| {
+            *self.cache.entry(block.clone()).or_insert_with(|| {
+                let idx = self.values.len();
+                self.values.push(block);
+                idx
+            })
+        });
+
+        let block = if let Some(&soln) = self.solutions.get(&hashes) {
+            self.values[soln].clone()
+        } else {
+            let (soln, _) = self.wrap.exec(blocks);
+            let idx = self.values.len();
+            self.values.push(soln.clone());
+            self.solutions.insert(hashes, idx);
+            if self.solutions.len() % 1000 == 0 {
+                dbg!(self.solutions.len());
+            }
+            soln
+        };
+
+        (block, KernelResult::NewBlock)
+    }
 }

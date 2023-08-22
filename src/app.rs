@@ -2,7 +2,7 @@ use egui::{Frame, Rect, Rgba, Rounding, Sense, Ui, Vec2};
 use rand::Rng;
 
 use crate::{
-    kernels::{basic_mnca, larger_than_life_layered_kernel, life_layered_kernel, Life},
+    kernels::{basic_mnca, larger_than_life_layered_kernel, life_layered_kernel, Life, KernelCache},
     sim::Dense,
 };
 
@@ -14,8 +14,9 @@ pub struct TemplateApp {
 
 impl Default for TemplateApp {
     fn default() -> Self {
-        let kernel = Box::new(basic_mnca());
-        let mut sim = Dense::new(kernel, 30, 30);
+        //let kernel = Box::new(basic_mnca());
+        let kernel = Box::new(KernelCache::new(Box::new(basic_mnca())));
+        let mut sim = Dense::new(kernel, 17*3, 10*3);
 
         let mut rng = rand::thread_rng();
         for block in sim.data_mut().data_mut() {
