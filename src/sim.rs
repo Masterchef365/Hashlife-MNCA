@@ -1,8 +1,7 @@
 use crate::array2d::Array2D;
 
 /// Block data, whose size is known by the Kernel
-#[derive(Clone, Debug, Default)]
-pub struct Block(pub Box<[bool]>);
+pub type Block = Array2D<bool>;
 
 pub trait Kernel {
     /// Power law size of the basic block. E.g. each block has a width of 2^n, where n = self.order()
@@ -23,7 +22,7 @@ pub enum KernelResult {
     Approximate,
 }
 
-struct Dense {
+pub struct Dense {
     back: Array2D<Block>,
     front: Array2D<Block>,
     kernel: Box<dyn Kernel>,
@@ -33,11 +32,12 @@ struct Dense {
 impl Dense {
     pub fn new(kernel: Box<dyn Kernel>, width: usize, height: usize) -> Self {
         // To account for difference in size between frames, we add 1 to width and height
-        let zeros = vec![Block::zero(&*kernel); (width + 1) * (height + 1)];
+        let zero_block = Array2D::new(1 << kernel.order(), 1 << kernel.order());
+        let zeros = vec![zero_block; (width + 1) * (height + 1)];
 
         Self {
-            front: Array2D::from_array(width, zeros.clone()),
-            back: Array2D::from_array(width, zeros),
+            front: Array2D::from_array(width + 1, zeros.clone()),
+            back: Array2D::from_array(width + 1, zeros),
             kernel,
             zero_borders: true,
         }
@@ -73,88 +73,51 @@ impl Dense {
 
     /// Returns (width, height) in pixels
     pub fn pixel_dims(&self) -> (usize, usize) {
-        let w = Block::width(&*self.kernel);
-        (self.front.width() * w, self.front.height() * w)
+        let w = block_width(&*self.kernel);
+        ((self.front.width() - 1) * w, (self.front.height() - 1) * w)
     }
 
-    fn index_block_pixel(&self, index: (i32, i32)) -> (usize, usize) {
+    fn index_block_pixel(&self, index: (usize, usize)) -> ((usize, usize), (usize, usize)) {
         let (mut x, mut y) = index;
 
-        let w = Block::width(&*self.kernel);
+        let w = block_width(&*self.kernel);
 
         // Every other frame, the blocks are in an alternate configuration where the result of the
         // last frame is offset by half a block width
         if !self.zero_borders {
-            x += w as i32 / 2;
-            y += w as i32 / 2;
+            x += w / 2;
+            y += w / 2;
         }
 
-        (x as usize, y as usize)
+        ((x / w, y / w), (x % w, y % w))
     }
 
-    pub fn get_pixel(&self, index: (i32, i32)) -> bool {
-        let block_idx = self.index_block_pixel(index);
-        self.front[block_idx].get(&*self.kernel, index)
+    pub fn get_pixel(&self, index: (usize, usize)) -> bool {
+        let (block_idx, pixel_idx) = self.index_block_pixel(index);
+        self.front[block_idx][pixel_idx]
     }
 
-    pub fn set_pixel(&mut self, index: (i32, i32), val: bool) {
-        let block_idx = self.index_block_pixel(index);
-        self.front[block_idx].set(&*self.kernel, index, val);
+    pub fn set_pixel(&mut self, index: (usize, usize), val: bool) {
+        let (block_idx, pixel_idx) = self.index_block_pixel(index);
+        self.front[block_idx][pixel_idx] = val;
+    }
+
+    pub fn data_mut(&mut self) -> &mut Array2D<Block> {
+        &mut self.front
     }
 }
 
 fn get_block_zero_borders(arr: &Array2D<Block>, xy: (i32, i32)) -> Block {
     let (x, y) = xy;
     if x < 0 || y < 0 || x >= arr.width() as i32 || y >= arr.height() as i32 {
-        Block::zeros_like(&arr[(0, 0)])
+        let mut out = arr[(0, 0)].clone();
+        out.data_mut().iter_mut().for_each(|x| *x = false);
+        out
     } else {
         arr[(x as usize, y as usize)].clone()
     }
 }
 
-impl Block {
-    pub fn zero(ker: &dyn Kernel) -> Self {
-        Self::new(ker, vec![false; Self::width(ker).pow(2)])
-    }
-
-    pub fn new(ker: &dyn Kernel, data: Vec<bool>) -> Self {
-        let expected_len = Self::width(ker).pow(2);
-        assert_eq!(expected_len, data.len());
-        Self(data.into_boxed_slice())
-    }
-
-    pub fn width(ker: &dyn Kernel) -> usize {
-        1 << ker.order()
-    }
-
-    pub fn data_mut(Block(data): &mut Self) -> &mut [bool] {
-        data
-    }
-
-    pub fn data(Block(data): &Self) -> &[bool] {
-        data
-    }
-
-    pub fn zeros_like(other: &Self) -> Self {
-        Self(vec![false; other.0.len()].into_boxed_slice())
-    }
-
-    /// Get a subpixel within a block by x and y coordinates
-    /// X and Y wrap around block size, which is in units of 2^n
-    pub fn index(ker: &dyn Kernel, xy: (i32, i32)) -> usize {
-        let block_width = Self::width(ker) as i32;
-        let (x, y) = xy;
-        let (x, y) = (x % block_width, y % block_width);
-        (x + block_width * y) as usize
-    }
-
-    pub fn get(&self, ker: &dyn Kernel, xy: (i32, i32)) -> bool {
-        let Self(data) = self;
-        data[Self::index(ker, xy)]
-    }
-
-    pub fn set(&mut self, ker: &dyn Kernel, xy: (i32, i32), val: bool) {
-        let Self(data) = self;
-        data[Self::index(ker, xy)] = val;
-    }
+fn block_width(ker: &dyn Kernel) -> usize {
+    1 << ker.order()
 }

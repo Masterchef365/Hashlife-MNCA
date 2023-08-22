@@ -1,4 +1,4 @@
-use crate::sim::{Kernel, KernelResult, Block};
+use crate::{sim::{Kernel, KernelResult, Block}, array2d::Array2D};
 
 pub struct Life;
 
@@ -12,7 +12,7 @@ impl Kernel for Life {
         let mut buf = [0u8; 16];
         buf
             .iter_mut()
-            .zip(blocks.iter().map(|Block(data)| data.iter()).flatten())
+            .zip(blocks.iter().map(|arr| arr.data().iter()).flatten())
             .for_each(|(f, k)| *f = u8::from(*k));
 
         let mut out_data = vec![false; 4];
@@ -39,7 +39,7 @@ impl Kernel for Life {
             out_data.push(result);
         }
 
-        let out_block = Block::new(&*self, out_data);
+        let out_block = Array2D::from_array(2, out_data);
 
         (out_block, KernelResult::NewBlock)
     }

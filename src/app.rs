@@ -1,116 +1,129 @@
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)] // if we add new fields, give them default values when deserializing old state
-pub struct TemplateApp {
-    // Example stuff:
-    label: String,
+use egui::{Sense, Rect, Frame, Ui, Vec2, Rounding, Rgba};
+use rand::Rng;
 
-    // this how you opt-out of serialization of a member
-    #[serde(skip)]
-    value: f32,
+use crate::{sim::Dense, kernels::Life};
+
+pub struct TemplateApp {
+    sim: Dense,
+    pause: bool,
+    single_step: bool,
 }
 
 impl Default for TemplateApp {
     fn default() -> Self {
+        let kernel = Box::new(Life);
+        let mut sim = Dense::new(kernel, 100, 100);
+
+        let mut rng = rand::thread_rng();
+        for block in sim.data_mut().data_mut() {
+            for pixel in block.data_mut() {
+                *pixel = rng.gen_bool(0.5);
+            }
+        }
+
         Self {
-            // Example stuff:
-            label: "Hello World!".to_owned(),
-            value: 2.7,
+            sim,
+            pause: true,
+            single_step: false,
         }
     }
 }
 
 impl TemplateApp {
-    /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
-
-        Default::default()
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        Self::default()
     }
 }
 
 impl eframe::App for TemplateApp {
-    /// Called by the frame work to save state before shutdown.
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, self);
-    }
-
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let Self { label, value } = self;
+        ctx.request_repaint();
 
-        // Examples of how to create different panels and windows.
-        // Pick whichever suits you.
-        // Tip: a good default choice is to just keep the `CentralPanel`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
-
-        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
-                        _frame.close();
-                    }
-                });
-            });
-        });
+        if !self.pause || self.single_step {
+            self.sim.step();
+            self.single_step = false;
+        }
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            ui.heading("Side Panel");
-
             ui.horizontal(|ui| {
-                ui.label("Write something: ");
-                ui.text_edit_singleline(label);
-            });
-
-            ui.add(egui::Slider::new(value, 0.0..=10.0).text("value"));
-            if ui.button("Increment").clicked() {
-                *value += 1.0;
-            }
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    ui.label("powered by ");
-                    ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-                    ui.label(" and ");
-                    ui.hyperlink_to(
-                        "eframe",
-                        "https://github.com/emilk/egui/tree/master/crates/eframe",
-                    );
-                    ui.label(".");
-                });
+                ui.checkbox(&mut self.pause, "Pause");
+                self.single_step |= ui.button("Step").clicked();
             });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // The central panel the region left after adding TopPanel's and SidePanel's
-
-            ui.heading("eframe template");
-            ui.hyperlink("https://github.com/emilk/eframe_template");
-            ui.add(egui::github_link_file!(
-                "https://github.com/emilk/eframe_template/blob/master/",
-                "Source code."
-            ));
-            egui::warn_if_debug_build(ui);
-        });
-
-        if false {
-            egui::Window::new("Window").show(ctx, |ui| {
-                ui.label("Windows can be moved by dragging them.");
-                ui.label("They are automatically sized based on contents.");
-                ui.label("You can turn on resizing and scrolling if you like.");
-                ui.label("You would normally choose either panels OR windows.");
+            Frame::canvas(ui.style()).show(ui, |ui| {
+                sim_widget(&mut self.sim, ui);
             });
+        });
+    }
+}
+
+
+/// Maps sim coordinates to/from egui coordinates
+struct CoordinateMapping {
+    width: f32,
+    height: f32,
+    area: Rect,
+}
+
+impl CoordinateMapping {
+    pub fn new(width: usize, height: usize, area: Rect) -> Self {
+        Self {
+            width: width as f32,
+            height: height as f32,
+            area,
+        }
+    }
+
+    pub fn sim_to_egui(&self, pt: (usize, usize)) -> egui::Pos2 {
+        let (x, y) = pt;
+        egui::Pos2::new(
+            (x as f32 / self.width) * self.area.width(),
+            (1. - y as f32 / self.height) * self.area.height(),
+        ) + self.area.min.to_vec2()
+    }
+
+    pub fn sim_to_egui_vect(&self, pt: (usize, usize)) -> egui::Vec2 {
+        let (x, y) = pt;
+        Vec2::new(
+            (x as f32 / self.width) * self.area.width(),
+            (y as f32 / self.height) * self.area.height(),
+        )
+    }
+
+
+    /*
+    pub fn egui_to_sim(&self, pt: egui::Pos2) -> (usize, usize) {
+        glam::Vec2::new(
+            (pt.x / self.area.width()) * self.width,
+            (1. - pt.y / self.area.height()) * self.height,
+        )
+    }
+    */
+}
+
+fn sim_widget(sim: &mut Dense, ui: &mut Ui) {
+    let (widget_area, _response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
+
+    let (w, h) = sim.pixel_dims();
+    let coords = CoordinateMapping::new(w, h, widget_area);
+
+    let rect_size = coords.sim_to_egui_vect((1, 1));
+
+    // Draw particles
+    let painter = ui.painter_at(widget_area);
+    for i in 0..w {
+        for j in 0..h {
+            if sim.get_pixel((i, j)) {
+                let pt = coords.sim_to_egui((i, j));
+                //dbg!(pt);
+                let rect = Rect::from_min_size(pt, rect_size);
+                painter.rect_filled(rect, Rounding::none(), Rgba::WHITE);
+            }
         }
     }
 }
+

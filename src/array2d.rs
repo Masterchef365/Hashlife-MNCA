@@ -1,6 +1,6 @@
 pub type GridPos = (usize, usize);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Array2D<T> {
     width: usize,
     data: Vec<T>,
@@ -8,7 +8,7 @@ pub struct Array2D<T> {
 
 impl<T> Array2D<T> {
     pub fn from_array(width: usize, data: Vec<T>) -> Self {
-        assert_eq!(data.len() % width, 0);
+        assert_eq!(data.len() % width, 0, "Width does not match data length");
         Self { width, data }
     }
 
