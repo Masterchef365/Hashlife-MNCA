@@ -1,3 +1,5 @@
+use crate::array2d::Array2D;
+
 /// Block data, whose size is known by the Kernel
 #[derive(Clone, Debug, Default)]
 pub struct Block(Box<[bool]>);
@@ -22,77 +24,91 @@ pub enum KernelResult {
 }
 
 struct Dense {
-    blocks: Vec<Block>,
-    width: usize,
+    back: Array2D<Block>,
+    front: Array2D<Block>,
     kernel: Box<dyn Kernel>,
-    offset_is_needed: bool,
+    zero_borders: bool,
 }
 
 impl Dense {
     pub fn new(kernel: Box<dyn Kernel>, width: usize, height: usize) -> Self {
+        // To account for difference in size between frames, we add 1 to width and height
+        let zeros = vec![Block::zero(&*kernel); (width + 1) * (height + 1)];
+
         Self {
-            blocks: vec![Block::zero(&*kernel); width * height],
-            width,
+            front: Array2D::from_array(width, zeros.clone()),
+            back: Array2D::from_array(width, zeros),
             kernel,
-            offset_is_needed: false,
+            zero_borders: true,
         }
     }
 
     pub fn step(&mut self) {
+        for i in 0..(self.front.width() - 1) as i32 {
+            for j in 0..(self.front.height() - 1) as i32 {
+                let (x, y) = if self.zero_borders {
+                    (i - 1, j - 1)
+                } else {
+                    (i, j)
+                };
+
+                let in_blocks = [
+                    (x, y),
+                    (x + 1, y),
+                    (x, y + 1),
+                    (x + 1, y + 1),
+                ];
+
+                let in_blocks = in_blocks.map(|uv| get_block_zero_borders(&self.front, uv));
+
+                let (out_block, _) = self.kernel.approximate(in_blocks);
+
+                self.back[(i as usize, j as usize)] = out_block;
+            }
+        }
+
+        std::mem::swap(&mut self.back, &mut self.front);
+        self.zero_borders = !self.zero_borders;
     }
 
     /// Returns (width, height) in pixels
     pub fn pixel_dims(&self) -> (usize, usize) {
         let w = Block::width(&*self.kernel);
-        (
-            self.width_blocks() * w,
-            self.height_blocks() * w,
-        )
+        (self.front.width() * w, self.front.height() * w)
     }
 
-    pub fn width_blocks(&self) -> usize {
-        self.width
-    }
-
-    pub fn height_blocks(&self) -> usize {
-        assert_eq!(
-            self.blocks.len() % self.width_blocks(),
-            0,
-            "Invalid number of blocks..."
-        );
-        self.blocks.len() / self.width_blocks()
-    }
-
-    pub fn index(&self, index: (i32, i32)) -> Option<usize> {
+    fn index_block_pixel(&self, index: (i32, i32)) -> (usize, usize) {
         let (mut x, mut y) = index;
 
+        let w = Block::width(&*self.kernel);
+
         // Every other frame, the blocks are in an alternate configuration where the result of the
-        // last frame is offset by half
-        if self.offset_is_needed {
-            let w = Block::width(&*self.kernel) / 2;
-            x += w as i32;
-            y += w as i32;
+        // last frame is offset by half a block width
+        if !self.zero_borders {
+            x += w as i32 / 2;
+            y += w as i32 / 2;
         }
 
-        let in_bounds = x >= 0 && y >= 0 && x < self.width_blocks() as i32 && y < self.height_blocks() as i32;
-        in_bounds.then(|| x as usize + y as usize * self.height_blocks())
+        (x as usize, y as usize)
     }
 
-    pub fn get_block(&self, index: (i32, i32)) -> Option<&Block> {
-        self.index(index).and_then(|i| self.blocks.get(i))
+    pub fn get_pixel(&self, index: (i32, i32)) -> bool {
+        let block_idx = self.index_block_pixel(index);
+        self.front[block_idx].get(&*self.kernel, index)
     }
 
-    pub fn get_mut_block(&mut self, index: (i32, i32)) -> Option<&mut Block> {
-        self.index(index).and_then(|i| self.blocks.get_mut(i))
+    pub fn set_pixel(&mut self, index: (i32, i32), val: bool) {
+        let block_idx = self.index_block_pixel(index);
+        self.front[block_idx].set(&*self.kernel, index, val);
     }
+}
 
-    pub fn get_pixel(&self, pixel: (i32, i32)) -> bool {
-        let (x, y) = pixel;
-        let x_block = x / self.width_blocks() as i32;
-        let y_block = y / self.height_blocks() as i32;
-        let block = &self.get_block((x_block, y_block)).unwrap();
-
-        block.get(&*self.kernel, (x, y))
+fn get_block_zero_borders(arr: &Array2D<Block>, xy: (i32, i32)) -> Block {
+    let (x, y) = xy;
+    if x < 0 || y < 0 || x >= arr.width() as i32 || y >= arr.height() as i32 {
+        Block::zeros_like(&arr[(0, 0)])
+    } else {
+        arr[(x as usize, y as usize)].clone()
     }
 }
 
@@ -117,6 +133,10 @@ impl Block {
 
     pub fn data(Block(data): &Self) -> &[bool] {
         data
+    }
+
+    pub fn zeros_like(other: &Self) -> Self {
+        Self(vec![false; other.0.len()].into_boxed_slice())
     }
 
     /// Get a subpixel within a block by x and y coordinates
