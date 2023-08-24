@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use eframe::epaint::ahash::AHashSet;
+use eframe::epaint::ahash::{AHashSet, AHashMap};
 use egui::epaint::ahash::HashMap;
 use lru::LruCache;
 
@@ -348,11 +348,12 @@ fn count_true(arr: &Array2D<bool>) -> usize {
 }
 
 pub struct KernelCache {
-    cache: HashMap<Summary, usize>,
+    cache: AHashMap<Summary, usize>,
     solutions: LruCache<[usize; 4], usize>,
-    values: HashMap<usize, Array2D<bool>>,
+    values: AHashMap<usize, Array2D<bool>>,
     wrap: Box<dyn Kernel>,
     hits: usize,
+    next_idx: usize,
 }
 
 impl KernelCache {
@@ -363,6 +364,7 @@ impl KernelCache {
             values: Default::default(),
             wrap,
             hits: 0,
+            next_idx: 0,
         }
     }
 }
@@ -379,7 +381,8 @@ impl Kernel for KernelCache {
                 .cache
                 .entry(summarize(&block, DOWNSAMPLE))
                 .or_insert_with(|| {
-                    let idx = self.values.len();
+                    let idx = self.next_idx;
+                    self.next_idx += 1;
                     self.values.insert(idx, block);
                     idx
                 })
@@ -387,12 +390,11 @@ impl Kernel for KernelCache {
 
         if self.solutions.get(&hashes).is_some() {
             self.hits += 1;
-            dbg!(self.hits);
-
+            
             let max_cache = 10_000;
             let max_values = 10_000;
-            if self.cache.len() > max_cache && self.values.len() > max_values {
-                eprintln!("Garbage collectiong");
+            if self.cache.len() > max_cache || self.values.len() > max_values {
+                eprintln!("Garbage collecting");
                 let in_cache: AHashSet<usize> = self
                     .solutions
                     .iter()
@@ -401,10 +403,19 @@ impl Kernel for KernelCache {
                     .collect();
 
                 self.cache.retain(|_, v| in_cache.contains(v));
+                self.values.retain(|k, _| in_cache.contains(k));
                 //self.values
                 // Garbage collection...
                 //self.cache.retain(|_, v|)
             }
+
+            dbg!(
+                self.hits,
+                self.values.len(),
+                self.solutions.len(),
+                self.cache.len(),
+            );
+
         }
 
         let soln_idx = *self.solutions.get_or_insert(hashes, || {
@@ -413,13 +424,14 @@ impl Kernel for KernelCache {
                 .cache
                 .entry(summarize(&soln, DOWNSAMPLE))
                 .or_insert_with(|| {
-                    let idx = self.values.len();
-                    self.values.push(soln.clone());
+                    let idx = self.next_idx;
+                    self.next_idx += 1;
+                    self.values.insert(idx, soln.clone());
                     idx
                 })
         });
 
-        let block = self.values[soln_idx].clone();
+        let block = self.values.get(&soln_idx).unwrap().clone();
 
         //dbg!(self.solutions.len());
 
