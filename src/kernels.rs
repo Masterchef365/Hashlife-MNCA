@@ -1,5 +1,6 @@
 use std::num::NonZeroUsize;
 
+use eframe::epaint::ahash::AHashSet;
 use egui::epaint::ahash::HashMap;
 use lru::LruCache;
 
@@ -349,7 +350,7 @@ fn count_true(arr: &Array2D<bool>) -> usize {
 pub struct KernelCache {
     cache: HashMap<Summary, usize>,
     solutions: LruCache<[usize; 4], usize>,
-    values: Vec<Array2D<bool>>,
+    values: HashMap<usize, Array2D<bool>>,
     wrap: Box<dyn Kernel>,
     hits: usize,
 }
@@ -379,10 +380,32 @@ impl Kernel for KernelCache {
                 .entry(summarize(&block, DOWNSAMPLE))
                 .or_insert_with(|| {
                     let idx = self.values.len();
-                    self.values.push(block);
+                    self.values.insert(idx, block);
                     idx
                 })
         });
+
+        if self.solutions.get(&hashes).is_some() {
+            self.hits += 1;
+            dbg!(self.hits);
+
+            let max_cache = 10_000;
+            let max_values = 10_000;
+            if self.cache.len() > max_cache && self.values.len() > max_values {
+                eprintln!("Garbage collectiong");
+                let in_cache: AHashSet<usize> = self
+                    .solutions
+                    .iter()
+                    .map(|(&[a, b, c, d], &e)| [a, b, c, d, e])
+                    .flatten()
+                    .collect();
+
+                self.cache.retain(|_, v| in_cache.contains(v));
+                //self.values
+                // Garbage collection...
+                //self.cache.retain(|_, v|)
+            }
+        }
 
         let soln_idx = *self.solutions.get_or_insert(hashes, || {
             let (soln, _) = self.wrap.exec(blocks);
@@ -398,7 +421,7 @@ impl Kernel for KernelCache {
 
         let block = self.values[soln_idx].clone();
 
-        dbg!(self.solutions.len());
+        //dbg!(self.solutions.len());
 
         (block, KernelResult::NewBlock)
     }
