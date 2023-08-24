@@ -1,4 +1,7 @@
+use std::num::NonZeroUsize;
+
 use egui::epaint::ahash::HashMap;
+use lru::LruCache;
 
 use crate::{
     array2d::Array2D,
@@ -345,7 +348,7 @@ fn count_true(arr: &Array2D<bool>) -> usize {
 
 pub struct KernelCache {
     cache: HashMap<Summary, usize>,
-    solutions: HashMap<[usize; 4], usize>,
+    solutions: LruCache<[usize; 4], usize>,
     values: Vec<Array2D<bool>>,
     wrap: Box<dyn Kernel>,
     hits: usize,
@@ -353,7 +356,13 @@ pub struct KernelCache {
 
 impl KernelCache {
     pub fn new(wrap: Box<dyn Kernel>) -> Self {
-        Self { cache: Default::default(), solutions: Default::default(), values: Default::default(), wrap, hits: 0 }
+        Self {
+            cache: Default::default(),
+            solutions: LruCache::new(NonZeroUsize::new(8888).unwrap()),
+            values: Default::default(),
+            wrap,
+            hits: 0,
+        }
     }
 }
 
@@ -363,46 +372,41 @@ impl Kernel for KernelCache {
     }
 
     fn exec(&mut self, blocks: [Block; 4]) -> (Block, KernelResult) {
-        const DOWNSAMPLE: usize = 31;
+        const DOWNSAMPLE: usize = 1;
         let hashes = blocks.clone().map(|block| {
-            *self.cache.entry(summarize(&block, DOWNSAMPLE)).or_insert_with(|| {
-                let idx = self.values.len();
-                self.values.push(block);
-                idx
-            })
+            *self
+                .cache
+                .entry(summarize(&block, DOWNSAMPLE))
+                .or_insert_with(|| {
+                    let idx = self.values.len();
+                    self.values.push(block);
+                    idx
+                })
         });
 
-        let block = if let Some(&soln) = self.solutions.get(&hashes) {
-            self.hits += 1;
-            self.values[soln].clone()
-        } else {
+        let soln_idx = *self.solutions.get_or_insert(hashes, || {
             let (soln, _) = self.wrap.exec(blocks);
-            
-            let idx = *self.cache.entry(summarize(&soln, DOWNSAMPLE)).or_insert_with(|| {
-                let idx = self.values.len();
-                self.values.push(soln.clone());
-                idx
-            });
-            self.solutions.insert(hashes, idx);
+            *self
+                .cache
+                .entry(summarize(&soln, DOWNSAMPLE))
+                .or_insert_with(|| {
+                    let idx = self.values.len();
+                    self.values.push(soln.clone());
+                    idx
+                })
+        });
 
-            if self.solutions.len() % 1000 == 0 {
-                dbg!(self.solutions.len(), self.values.len(), self.hits);
-                eprintln!();
-            }
+        let block = self.values[soln_idx].clone();
 
-            soln
-        };
+        dbg!(self.solutions.len());
 
         (block, KernelResult::NewBlock)
     }
 }
 
-type Summary = (Vec<bool>, usize);
+type Summary = Array2D<bool>;
 //type Summary = usize;
 
 fn summarize(arr: &Array2D<bool>, step: usize) -> Summary {
-    (
-        arr.data().iter().step_by(step).copied().collect(),
-        count_true(arr)
-    )
+    arr.clone()
 }

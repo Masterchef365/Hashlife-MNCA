@@ -17,6 +17,7 @@ eframe = { version = "0.22.0", default-features = false, features = [
 log = "0.4"
 rand = { version = "0.8" }
 getrandom = { version = "*", features = ["js"] }
+lru = "0.11.0"
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
